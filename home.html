@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Rugby stat tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  /* ---------- Tokens: light = whiteboard, dark = chalkboard ---------- */
+  :root {
+    --paper: #f7f8f5;
+    --ink: #15181a;          /* static labels, outlines (black) */
+    --ink-soft: #7a827d;     /* dotted centre line */
+    --gray: #6a726d;         /* user-entered text (team names) */
+    --gray-line: #b3b9b4;
+    --blue: #1d48d6;         /* live, computed values */
+    --green: #12894a;
+    --red: #d9332d;
+    --green-tint: #dcf1e4;
+    --red-tint: #fadedc;
+    --on-color: #ffffff;
+
+    --hand: 'Patrick Hand', 'Segoe Print', 'Bradley Hand', system-ui, sans-serif;
+    --marker: 'Permanent Marker', 'Marker Felt', 'Chalkboard SE', Impact, system-ui, sans-serif;
+
+    --u: min(100vw, 640px);
+    --btn: clamp(36px, calc(var(--u) * .1), 60px);
+    --val: clamp(28px, calc(var(--u) * .085), 52px);
+    --pad: clamp(10px, 3vw, 20px);
+
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #1e2426;
+      --ink: #eef1ee;
+      --ink-soft: #7d8783;
+      --gray: #9ca5a1;
+      --gray-line: #55605c;
+      --blue: #79b4ff;
+      --green: #3fcf7c;
+      --red: #ff6b62;
+      --green-tint: rgba(63, 207, 124, .16);
+      --red-tint: rgba(255, 107, 98, .16);
+      --on-color: #10171a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #1e2426;
+    --ink: #eef1ee;
+    --ink-soft: #7d8783;
+    --gray: #9ca5a1;
+    --gray-line: #55605c;
+    --blue: #79b4ff;
+    --green: #3fcf7c;
+    --red: #ff6b62;
+    --green-tint: rgba(63, 207, 124, .16);
+    --red-tint: rgba(255, 107, 98, .16);
+    --on-color: #10171a;
+  }
+  @media (max-width: 349px) {
+    :root { --btn: 31px; }
+    .wl { --val: 40px; }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { height: 100%; background: var(--paper); scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    height: 100%;
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--hand);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  input, textarea { -webkit-user-select: text; user-select: text; }
+  button { font: inherit; color: inherit; }
+
+  .app {
+    max-width: 640px;
+    min-height: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 8px var(--pad) 14px;
+    padding-left: max(var(--pad), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--pad), env(safe-area-inset-right, 0px));
+  }
+
+  /* ---------- Scoreboard ---------- */
+  .scoreboard {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: clamp(8px, 2.4vw, 16px);
+    align-items: stretch;
+    padding: 6px 0 14px;
+  }
+  .scorebox {
+    border: 3px solid var(--ink);
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    min-height: clamp(88px, calc(var(--u) * .27), 140px);
+    overflow: hidden;
+  }
+  .scorenum {
+    display: inline-block;
+    font-family: var(--marker);
+    font-size: clamp(46px, calc(var(--u) * .15), 90px);
+    line-height: 1;
+    color: var(--blue);
+  }
+  .scorenum.tri { font-size: clamp(34px, calc(var(--u) * .11), 66px); }
+  .clockcol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 2vw, 14px);
+  }
+  .clockbox {
+    border: 3px solid var(--ink);
+    border-radius: 10px;
+    padding: 6px clamp(8px, 2.4vw, 16px) 5px;
+    text-align: center;
+  }
+  .clock {
+    font-family: var(--marker);
+    font-size: clamp(32px, calc(var(--u) * .105), 60px);
+    line-height: 1.1;
+    color: var(--blue);
+    white-space: nowrap;
+  }
+  .period {
+    font-size: clamp(15px, calc(var(--u) * .042), 22px);
+    line-height: 1;
+    color: var(--blue);
+    margin-top: 3px;
+  }
+  .clock .d { display: inline-block; width: .7em; text-align: center; }
+  .clock .d.c { width: .32em; }
+
+  .transport {
+    display: flex;
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .seg {
+    width: clamp(34px, calc(var(--u) * .095), 56px);
+    height: clamp(34px, calc(var(--u) * .095), 46px);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .12s;
+  }
+  .seg + .seg { border-left: 3px solid var(--ink); }
+  .seg svg { width: 46%; height: 62%; fill: currentColor; }
+  .seg.play { color: var(--green); }
+  .seg.pause { color: var(--red); }
+  .seg.play.on { background: var(--green-tint); }
+  .seg.pause.on { background: var(--red-tint); }
+  .seg:active { background: var(--ink-soft); }
+  .seg:focus-visible { outline: 3px solid var(--blue); outline-offset: -6px; }
+  .seg.half {
+    font-family: var(--hand);
+    font-size: clamp(18px, calc(var(--u) * .05), 25px);
+    line-height: 1;
+    color: var(--green);
+  }
+  .seg.half.on { background: var(--green-tint); }
+  .seg:disabled { opacity: .3; cursor: not-allowed; }
+  .seg:disabled:active { background: transparent; }
+
+  /* ---------- Team names (user input, gray) ---------- */
+  .names {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 3px solid var(--ink);
+  }
+  .team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 8px 8px;
+    min-width: 0;
+  }
+  .team + .team { border-left: 3px solid var(--ink); }
+  .role {
+    font-size: clamp(17px, calc(var(--u) * .05), 26px);
+    color: var(--ink);
+  }
+  .team input {
+    width: 100%;
+    text-align: center;
+    font-family: var(--hand);
+    font-size: clamp(25px, calc(var(--u) * .078), 42px);
+    line-height: 1.15;
+    color: var(--gray);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px dashed var(--gray-line);
+    border-radius: 0;
+    padding: 0 4px 2px;
+    outline: none;
+  }
+  .team input::placeholder { color: var(--gray); opacity: .55; }
+  .team input:focus-visible { outline: 3px solid var(--blue); outline-offset: 1px; border-radius: 6px; border-bottom-color: transparent; }
+  .hint {
+    margin: 8px 0 0;
+    text-align: center;
+    font-size: 18px;
+    color: var(--ink);
+  }
+  .hint[hidden] { display: none; }
+
+  /* ---------- Board ---------- */
+  .board {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    padding: 4px 0;
+  }
+  .board::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    border-left: 3px dotted var(--ink-soft);
+    transform: translateX(-50%);
+    z-index: 0;
+  }
+  .board > * { position: relative; z-index: 1; }
+  .rule { height: 3px; margin: 0 3%; background: var(--ink); border-radius: 3px; flex: none; }
+
+  .row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 6px;
+    padding: clamp(6px, 1.2vh, 12px) 0;
+  }
+  .label {
+    justify-self: center;
+    max-width: 100%;
+    font-size: clamp(16px, calc(var(--u) * .047), 27px);
+    line-height: 1.05;
+    text-align: center;
+    background: var(--paper);
+    padding: 3px .2em;
+    color: var(--ink);
+  }
+  .side-v { justify-self: start; }
+  .side-h { justify-self: end; }
+
+  .group {
+    display: grid;
+    grid-template-columns: var(--btn) minmax(var(--val), auto) var(--btn);
+    column-gap: clamp(2px, .8vw, 8px);
+    align-items: center;
+    justify-items: center;
+  }
+  .wl { --val: clamp(48px, calc(var(--u) * .13), 84px); }
+  .val {
+    display: inline-block;
+    font-family: var(--marker);
+    font-size: clamp(22px, calc(var(--u) * .07), 40px);
+    line-height: 1;
+    color: var(--blue);
+    white-space: nowrap;
+  }
+  .wl .val { font-size: clamp(20px, calc(var(--u) * .062), 36px); }
+  .wlhead { padding: 8px 0 0; }
+  .wlhead .group span { font-size: clamp(16px, calc(var(--u) * .045), 24px); color: var(--ink); line-height: 1; }
+
+  /* Round +/- buttons: black outline, green or red mark */
+  .btn {
+    position: relative;
+    width: var(--btn);
+    height: var(--btn);
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    background: var(--tint);
+    color: var(--c);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .08s, background-color .12s, color .12s;
+  }
+  .btn::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; }
+  .btn.plus  { --c: var(--green); --tint: var(--green-tint); }
+  .btn.minus { --c: var(--red);   --tint: var(--red-tint); }
+  .btn svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+  .btn:active:not(:disabled) { transform: scale(.9); background: var(--c); color: var(--on-color); }
+  .btn:disabled { opacity: .28; cursor: not-allowed; }
+  .btn:focus-visible, .pad:focus-visible, .textbtn:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+
+  /* Possession / territory: green = has it now, red = doesn't */
+  .row.padrow { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .padside { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; }
+  .pct {
+    font-family: var(--marker);
+    font-size: clamp(17px, calc(var(--u) * .05), 30px);
+    color: var(--blue);
+    min-width: 3.3ch;
+    line-height: 1;
+  }
+  .padside.side-v .pct { text-align: left; }
+  .padside.side-h .pct { text-align: right; }
+  .pad {
+    position: relative;
+    flex: none;
+    width: clamp(48px, calc(var(--u) * .135), 90px);
+    height: clamp(32px, calc(var(--u) * .085), 46px);
+    border: 3px solid var(--ink);
+    border-radius: 9px;
+    background: var(--red);
+    color: var(--on-color);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .12s, transform .08s;
+  }
+  .pad::after { content: ""; position: absolute; inset: -4px; }
+  .pad[aria-pressed="true"] { background: var(--green); }
+  .pad:active { transform: scale(.94); }
+  .pad svg { width: 42%; height: 62%; fill: none; stroke: currentColor; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .pad[aria-pressed="true"] svg { opacity: 1; }
+
+  .note {
+    align-self: center;
+    background: var(--paper);
+    padding: 0 .5em;
+    font-size: clamp(14px, calc(var(--u) * .04), 19px);
+    line-height: 1.1;
+    color: var(--ink);
+    margin: -2px 0 4px;
+  }
+  .foot { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; column-gap: 10px; padding-top: 10px; }
+  .textbtn {
+    background: none;
+    border: 0;
+    font-family: var(--hand);
+    font-size: 19px;
+    color: var(--ink);
+    padding: 8px 14px;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .textbtn.armed { color: var(--red); }
+
+  /* ---------- Share sheet ---------- */
+  dialog {
+    width: min(92vw, 460px);
+    max-height: 90%;
+    padding: 0;
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    background: var(--paper);
+    color: var(--ink);
+    overflow: auto;
+  }
+  dialog::backdrop { background: rgba(10, 14, 16, .6); }
+  .sheet { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .sheet h2 { margin: 0; font-family: var(--hand); font-weight: 400; font-size: 28px; line-height: 1.1; }
+  .sheet textarea {
+    width: 100%;
+    min-height: 200px;
+    resize: none;
+    overflow: hidden;
+    font-family: var(--hand);
+    font-size: 19px;
+    line-height: 1.35;
+    color: var(--ink);
+    background: transparent;
+    border: 2px solid var(--gray-line);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .dlgbtns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .pillbtn {
+    font-family: var(--hand);
+    font-size: 21px;
+    line-height: 1.1;
+    padding: 6px 18px;
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .pillbtn.go { color: var(--green); background: var(--green-tint); }
+  .pillbtn[hidden] { display: none; }
+  .pillbtn:focus-visible, textarea:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+  /* ---------- Motion (answers a tap) ---------- */
+  .pop { animation: pop .22s ease-out; }
+  @keyframes pop { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
+  /* Hold-to-undo: a red ring fills while you hold, then the button flashes red */
+  .btn.holding { animation: charge .55s linear forwards; }
+  .seg.holding { animation: charge-in .55s linear forwards; }
+  .btn.undone, .seg.undone { animation: undone .35s ease-out; }
+  @keyframes charge { from { box-shadow: 0 0 0 0 var(--red); } to { box-shadow: 0 0 0 7px var(--red); } }
+  @keyframes charge-in { from { box-shadow: inset 0 0 0 0 var(--red); } to { box-shadow: inset 0 0 0 7px var(--red); } }
+  @keyframes undone { from { background: var(--red); color: var(--on-color); transform: scale(.88); } }
+  .shake { animation: shake .34s; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 45% { transform: translateX(6px); } 70% { transform: translateX(-4px); } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+
+  <header class="scoreboard">
+    <div class="scorebox" id="boxV" role="group" aria-label="Visitor score"><span class="scorenum" id="scoreV">0</span></div>
+    <div class="clockcol">
+      <div class="clockbox">
+        <div class="clock" id="clock" role="timer" aria-label="Match clock 00:00"></div>
+        <div class="period" id="period">Kick-off</div>
+      </div>
+      <div class="transport">
+        <button type="button" class="seg play" id="playBtn" aria-label="Start clock" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </button>
+        <button type="button" class="seg pause" id="pauseBtn" aria-label="Pause clock">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1.2"/><rect x="14" y="4.5" width="4.5" height="15" rx="1.2"/></svg>
+        </button>
+        <button type="button" class="seg half" id="halfBtn" aria-label="Mark half-time" aria-pressed="false" aria-keyshortcuts="Backspace" disabled>HT</button>
+        <button type="button" class="seg half" id="fullBtn" aria-label="Mark full-time" aria-pressed="false" aria-keyshortcuts="Backspace" disabled>FT</button>
+      </div>
+    </div>
+    <div class="scorebox" id="boxH" role="group" aria-label="Home score"><span class="scorenum" id="scoreH">0</span></div>
+  </header>
+
+  <section class="names" aria-label="Team names">
+    <label class="team">
+      <span class="role">Visitor</span>
+      <input id="nameV" type="text" maxlength="16" placeholder="Team 1" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
+    </label>
+    <label class="team">
+      <span class="role">Home</span>
+      <input id="nameH" type="text" maxlength="16" placeholder="Team 2" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
+    </label>
+  </section>
+  <p class="hint" id="hint" role="status" hidden>Enter both team names to start the clock.</p>
+
+  <section class="board" id="board" aria-label="Match statistics"></section>
+
+  <footer class="foot">
+    <button type="button" class="textbtn" id="shareBtn">Share stats</button>
+    <button type="button" class="textbtn" id="newMatch">New match</button>
+  </footer>
+
+</main>
+
+<dialog id="shareDlg" aria-labelledby="shareTitle">
+  <div class="sheet">
+    <h2 id="shareTitle">Match summary</h2>
+    <textarea id="shareText" readonly spellcheck="false" aria-label="Match summary text"></textarea>
+    <div class="dlgbtns">
+      <button type="button" class="pillbtn go" id="shareCopy" autofocus>Copy</button>
+      <button type="button" class="pillbtn go" id="shareNative" hidden>Share</button>
+      <button type="button" class="pillbtn" id="shareClose">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Model ---------- */
+  const KEY = 'rugby-stat-tracker-v1';
+  const SIDES = ['v', 'h'];
+  const TEAM = { v: 'Visitor', h: 'Home' };
+  const TEAM_KEYS = ['tries', 'conv', 'pk', 'scrumW', 'scrumL', 'loW', 'loL', 'pen', 'to'];
+  const blankTeam = () => Object.fromEntries(TEAM_KEYS.map(k => [k, 0]));
+  const blank = () => ({
+    names: { v: '', h: '' },
+    half: null,
+    full: null,
+    clockMs: 0, running: false, lastTick: 0,
+    poss: { v: 0, h: 0 }, terr: { v: 0, h: 0 },
+    possNow: null, terrNow: null,
+    stats: { v: blankTeam(), h: blankTeam() }
+  });
+
+  const ms = x => (Number.isFinite(x) && x > 0 ? x : 0);
+  const cnt = x => Math.floor(ms(x));
+  const sideOf = x => (x === 'v' || x === 'h' ? x : null);
+  const nameOf = x => (typeof x === 'string' ? x.slice(0, 16) : '');
+
+  function load() {
+    const b = blank();
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return b;
+      const p = JSON.parse(raw) || {};
+      b.names.v = nameOf(p.names && p.names.v);
+      b.names.h = nameOf(p.names && p.names.h);
+      b.clockMs = ms(p.clockMs);
+      if (p.half && typeof p.half === 'object') {
+        b.half = { clockMs: ms(p.half.clockMs), v: cnt(p.half.v), h: cnt(p.half.h) };
+      }
+      if (p.full && typeof p.full === 'object') {
+        b.full = { clockMs: ms(p.full.clockMs), v: cnt(p.full.v), h: cnt(p.full.h) };
+      }
+      SIDES.forEach(s => {
+        b.poss[s] = ms(p.poss && p.poss[s]);
+        b.terr[s] = ms(p.terr && p.terr[s]);
+        TEAM_KEYS.forEach(k => { b.stats[s][k] = cnt(p.stats && p.stats[s] && p.stats[s][k]); });
+        b.stats[s].conv = Math.min(b.stats[s].conv, b.stats[s].tries);
+      });
+      b.possNow = sideOf(p.possNow);
+      b.terrNow = sideOf(p.terrNow);
+      // A restored match always comes back paused so no time is invented.
+    } catch (e) { /* storage empty or unavailable */ }
+    return b;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+  let S = load();
+
+  const score = s => { const t = S.stats[s]; return t.tries * 5 + t.conv * 2 + t.pk * 3; };
+
+  /* ---------- Clock, possession and territory all run off one timer ---------- */
+  function settle() {
+    if (!S.running) return;
+    const now = Date.now();
+    const d = Math.max(0, now - S.lastTick);
+    S.lastTick = now;
+    S.clockMs += d;
+    if (S.possNow) S.poss[S.possNow] += d;
+    if (S.terrNow) S.terr[S.terrNow] += d;
+  }
+
+  let lock = null;
+  async function wake(on) {
+    try {
+      if (on && 'wakeLock' in navigator) {
+        lock = await navigator.wakeLock.request('screen');
+        lock.addEventListener('release', () => { lock = null; });
+      } else if (!on && lock) {
+        await lock.release();
+        lock = null;
+      }
+    } catch (e) { /* not supported or not permitted */ }
+  }
+
+  /* ---------- DOM helpers ---------- */
+  const $ = id => document.getElementById(id);
+  const el = (tag, cls, html) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  };
+  const SVG = {
+    plus:  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+    minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
+    check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+  };
+  const buzz = (n = 8) => { try { if (navigator.vibrate) navigator.vibrate(n); } catch (e) {} };
+  function setText(node, text, pop) {
+    if (node.textContent === text) return;
+    node.textContent = text;
+    if (pop) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
+  }
+  function iconBtn(kind, label, fn) {
+    const b = el('button', 'btn ' + kind, SVG[kind]);
+    b.type = 'button';
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', () => { if (wasHeld(b)) return; buzz(); fn(); });
+    return b;
+  }
+
+  /* Press and hold to undo. Works on any button; a normal tap is untouched. */
+  const HOLD_MS = 550;
+  function wasHeld(btn) {
+    if (btn._held) { btn._held = false; return true; }
+    return false;
+  }
+  function holdToUndo(btn, canUndo, undo) {
+    let timer = null;
+    const cancel = () => { clearTimeout(timer); timer = null; btn.classList.remove('holding'); };
+    const fire = () => {
+      btn.classList.remove('undone'); void btn.offsetWidth; btn.classList.add('undone');
+      undo();
+    };
+    btn.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      btn._held = false;
+      if (!canUndo()) return;
+      btn.classList.add('holding');
+      timer = setTimeout(() => {
+        timer = null;
+        btn._held = true;              // swallow the click that follows the release
+        btn.classList.remove('holding');
+        buzz(28);
+        fire();
+      }, HOLD_MS);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => btn.addEventListener(t, cancel));
+    btn.addEventListener('animationend', () => btn.classList.remove('undone'));
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+    btn.addEventListener('keydown', e => {
+      if ((e.key === 'Backspace' || e.key === 'Delete') && canUndo()) { e.preventDefault(); fire(); }
+    });
+  }
+
+  /* ---------- Actions ---------- */
+  function changed() { render(); save(); }
+
+  function bump(side, key, delta) {
+    const st = S.stats[side];
+    const next = st[key] + delta;
+    if (next < 0) return;
+    if (key === 'conv' && next > st.tries) return;   // a conversion needs a try
+    if (key === 'tries' && next < st.conv) return;   // remove the conversion first
+    st[key] = next;
+    changed();
+  }
+  function setNow(field, side) {
+    settle();
+    S[field] = S[field] === side ? null : side;      // tap again = nobody
+    changed();
+  }
+  function play() {
+    if (S.running) return;
+    const missing = !S.names.v.trim() ? 'v' : !S.names.h.trim() ? 'h' : null;
+    if (missing) {
+      $('hint').hidden = false;
+      const inp = R.name[missing];
+      inp.focus();
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      return;
+    }
+    S.running = true;
+    S.lastTick = Date.now();
+    wake(true);
+    changed();
+  }
+  function pause() {
+    if (!S.running) return;
+    settle();
+    S.running = false;
+    wake(false);
+    changed();
+  }
+
+  /* ---------- Build the board ---------- */
+  const R = { score: {}, name: {}, pct: { poss: {}, terr: {} }, pad: { poss: {}, terr: {} }, cnt: {}, wl: {} };
+
+  const rule = () => el('div', 'rule');
+
+  function padRow(field, label) {
+    const row = el('div', 'row padrow');
+    const cells = {};
+    SIDES.forEach(s => {
+      const wrap = el('div', 'padside side-' + s);
+      const pc = el('span', 'pct', '50%');
+      const pad = el('button', 'pad', SVG.check);
+      pad.type = 'button';
+      pad.setAttribute('aria-label', TEAM[s] + ' ' + label.toLowerCase());
+      pad.addEventListener('click', () => { buzz(); setNow(field + 'Now', s); });
+      if (s === 'v') wrap.append(pc, pad); else wrap.append(pad, pc);
+      R.pct[field][s] = pc;
+      R.pad[field][s] = pad;
+      cells[s] = wrap;
+    });
+    row.append(cells.v, el('div', 'label', label), cells.h);
+    return row;
+  }
+
+  function counterRow(key, label) {
+    const row = el('div', 'row counter');
+    const cells = {};
+    R.cnt[key] = {};
+    SIDES.forEach(s => {
+      const g = el('div', 'group side-' + s);
+      const minus = iconBtn('minus', TEAM[s] + ': remove ' + label.toLowerCase(), () => bump(s, key, -1));
+      const val = el('span', 'val', '0');
+      const plus = iconBtn('plus', TEAM[s] + ': add ' + label.toLowerCase(), () => bump(s, key, 1));
+      g.append(minus, val, plus);
+      R.cnt[key][s] = { minus, val, plus };
+      cells[s] = g;
+    });
+    row.append(cells.v, el('div', 'label', label), cells.h);
+    return row;
+  }
+
+  function wlHead() {
+    const row = el('div', 'row wl wlhead');
+    const cells = {};
+    SIDES.forEach(s => {
+      const g = el('div', 'group head side-' + s);
+      g.append(el('span', null, 'Won'), el('span'), el('span', null, 'Lost'));
+      cells[s] = g;
+    });
+    row.append(cells.v, el('span'), cells.h);
+    return row;
+  }
+
+  function wlRow(id, label, wKey, lKey) {
+    const row = el('div', 'row wl');
+    const cells = {};
+    R.wl[id] = { wKey, lKey };
+    SIDES.forEach(s => {
+      const g = el('div', 'group side-' + s);
+      const won = iconBtn('plus', TEAM[s] + ': ' + label.toLowerCase() + ' won', () => bump(s, wKey, 1));
+      const val = el('span', 'val', '0/0');
+      const lost = iconBtn('plus', TEAM[s] + ': ' + label.toLowerCase() + ' lost', () => bump(s, lKey, 1));
+      holdToUndo(won,  () => S.stats[s][wKey] > 0, () => bump(s, wKey, -1));
+      holdToUndo(lost, () => S.stats[s][lKey] > 0, () => bump(s, lKey, -1));
+      [won, lost].forEach(b => { b.title = 'Hold to undo'; b.setAttribute('aria-keyshortcuts', 'Backspace'); });
+      g.append(won, val, lost);
+      R.wl[id][s] = { val };
+      cells[s] = g;
+    });
+    row.append(cells.v, el('div', 'label', label), cells.h);
+    return row;
+  }
+
+  $('board').append(
+    padRow('poss', 'Possession'), rule(),
+    padRow('terr', 'Territory'), rule(),
+    counterRow('tries', 'Tries'),
+    counterRow('conv', 'Conversions'),
+    counterRow('pk', 'Penalty kicks'), rule(),
+    wlHead(),
+    wlRow('scrum', 'Scrums', 'scrumW', 'scrumL'),
+    wlRow('lo', 'Lineouts', 'loW', 'loL'),
+    el('div', 'note', 'Hold a + to undo'), rule(),
+    counterRow('pen', 'Penalties'),
+    counterRow('to', 'Turnovers')
+  );
+
+  R.score.v = $('scoreV'); R.score.h = $('scoreH');
+  R.name.v = $('nameV');   R.name.h = $('nameH');
+  R.clock = $('clock');
+  R.play = $('playBtn');
+  R.pause = $('pauseBtn');
+  R.half = $('halfBtn');
+  R.full = $('fullBtn');
+  R.period = $('period');
+
+  /* ---------- Render ---------- */
+  function shares(o) {
+    const t = o.v + o.h;
+    if (t <= 0) return { v: 50, h: 50 };
+    const v = Math.round(o.v / t * 100);
+    return { v, h: 100 - v };
+  }
+  function clockStr(msec) {
+    const t = Math.floor(msec / 1000);
+    return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+  }
+  function renderClock() {
+    const str = clockStr(S.clockMs);
+    if (R.clock.children.length !== str.length) {
+      R.clock.textContent = '';
+      for (let i = 0; i < str.length; i++) R.clock.append(el('span', 'd'));
+    }
+    for (let i = 0; i < str.length; i++) {
+      const n = R.clock.children[i];
+      if (n.textContent !== str[i]) n.textContent = str[i];
+      n.className = str[i] === ':' ? 'd c' : 'd';
+    }
+    R.clock.setAttribute('aria-label', 'Match clock ' + str);
+  }
+
+  function render() {
+    SIDES.forEach(s => {
+      const sc = score(s);
+      setText(R.score[s], String(sc), true);
+      R.score[s].classList.toggle('tri', sc >= 100);
+    });
+    renderClock();
+
+    R.play.classList.toggle('on', S.running);
+    R.play.setAttribute('aria-pressed', String(S.running));
+    R.pause.classList.toggle('on', !S.running && S.clockMs > 0);
+
+    const beyond = m => S.running || S.clockMs > m.clockMs + 500;   // clock has moved on since the marker
+    let cap = '1st half';
+    if (!S.half && !S.full && !S.running && S.clockMs <= 0) cap = 'Kick-off';
+    else if (S.full) cap = beyond(S.full) ? 'Extra time' : 'Full time';
+    else if (S.half) cap = beyond(S.half) ? '2nd half' : 'Half-time';
+    setText(R.period, cap);
+    [['half', R.half, 'half-time'], ['full', R.full, 'full-time']].forEach(([k, btn, name]) => {
+      const m = S[k];
+      btn.classList.toggle('on', !!m);
+      btn.setAttribute('aria-pressed', String(!!m));
+      btn.disabled = !m && S.clockMs <= 0;
+      const label = m ? name[0].toUpperCase() + name.slice(1) + ' marked at ' + clockStr(m.clockMs) + '. Hold to undo' : 'Mark ' + name;
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+    });
+
+    ['poss', 'terr'].forEach(f => {
+      const sh = shares(S[f]);
+      SIDES.forEach(s => {
+        R.pad[f][s].setAttribute('aria-pressed', String(S[f + 'Now'] === s));
+        setText(R.pct[f][s], sh[s] + '%');
+      });
+    });
+
+    Object.keys(R.cnt).forEach(key => {
+      SIDES.forEach(s => {
+        const st = S.stats[s], c = R.cnt[key][s];
+        setText(c.val, String(st[key]), true);
+        let minusOff = st[key] <= 0;
+        let plusOff = false;
+        if (key === 'tries' && st.tries <= st.conv) minusOff = true;
+        if (key === 'conv' && st.conv >= st.tries) plusOff = true;
+        c.minus.disabled = minusOff;
+        c.plus.disabled = plusOff;
+      });
+    });
+
+    Object.keys(R.wl).forEach(id => {
+      const { wKey, lKey } = R.wl[id];
+      SIDES.forEach(s => setText(R.wl[id][s].val, S.stats[s][wKey] + '/' + S.stats[s][lKey], true));
+    });
+
+    SIDES.forEach(s => { if (R.name[s].value !== S.names[s]) R.name[s].value = S.names[s]; });
+    if (S.names.v.trim() && S.names.h.trim()) $('hint').hidden = true;
+  }
+
+  /* ---------- Wiring ---------- */
+  SIDES.forEach(s => {
+    R.name[s].addEventListener('input', () => {
+      S.names[s] = R.name[s].value.slice(0, 16);
+      if (S.names.v.trim() && S.names.h.trim()) $('hint').hidden = true;
+      save();
+    });
+    R.name[s].addEventListener('keydown', e => { if (e.key === 'Enter') R.name[s].blur(); });
+    R.name[s].addEventListener('animationend', () => R.name[s].classList.remove('shake'));
+  });
+
+  R.play.addEventListener('click', () => { buzz(); play(); });
+  R.pause.addEventListener('click', () => { buzz(); pause(); });
+
+  /* Half-time and full-time markers: freeze the clock and record the score. Hold to undo. */
+  [['half', R.half], ['full', R.full]].forEach(([k, btn]) => {
+    btn.addEventListener('click', () => {
+      if (wasHeld(btn)) return;
+      if (S[k] || S.clockMs <= 0) return;
+      buzz();
+      settle();
+      S[k] = { clockMs: S.clockMs, v: score('v'), h: score('h') };
+      if (S.running) { S.running = false; wake(false); }
+      changed();
+    });
+    holdToUndo(btn, () => !!S[k], () => { S[k] = null; changed(); });
+  });
+
+  /* Share / export */
+  const dlg = $('shareDlg'), shareText = $('shareText'), copyBtn = $('shareCopy'), nativeBtn = $('shareNative');
+  let copyTimer = null;
+  function pctLine(o) {
+    if (o.v + o.h <= 0) return 'not tracked';
+    const p = shares(o);
+    return p.v + '% – ' + p.h + '%';
+  }
+  function summaryText() {
+    const vn = S.names.v.trim() || 'Visitor';
+    const hn = S.names.h.trim() || 'Home';
+    const a = S.stats.v, b = S.stats.h;
+    const lines = [];
+    lines.push(vn + ' ' + score('v') + '–' + score('h') + ' ' + hn);
+    lines.push('Match time ' + clockStr(S.clockMs));
+    if (S.half) lines.push('Half-time ' + S.half.v + '–' + S.half.h + ' (at ' + clockStr(S.half.clockMs) + ')');
+    if (S.full) lines.push('Full-time ' + S.full.v + '–' + S.full.h + ' (at ' + clockStr(S.full.clockMs) + ')');
+    lines.push('');
+    lines.push('Stats, ' + vn + ' – ' + hn + ':');
+    lines.push('Possession: ' + pctLine(S.poss));
+    lines.push('Territory: ' + pctLine(S.terr));
+    lines.push('Tries: ' + a.tries + ' – ' + b.tries);
+    lines.push('Conversions: ' + a.conv + ' – ' + b.conv);
+    lines.push('Penalty kicks: ' + a.pk + ' – ' + b.pk);
+    lines.push('Scrums won/lost: ' + a.scrumW + '/' + a.scrumL + ' – ' + b.scrumW + '/' + b.scrumL);
+    lines.push('Lineouts won/lost: ' + a.loW + '/' + a.loL + ' – ' + b.loW + '/' + b.loL);
+    lines.push('Penalties: ' + a.pen + ' – ' + b.pen);
+    lines.push('Turnovers: ' + a.to + ' – ' + b.to);
+    return lines.join('\n');
+  }
+  const closeDlg = () => { if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open'); };
+  function setCopyLabel(t, ms) {
+    copyBtn.textContent = t;
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { copyBtn.textContent = 'Copy'; }, ms);
+  }
+  $('shareBtn').addEventListener('click', () => {
+    settle();
+    shareText.value = summaryText();
+    copyBtn.textContent = 'Copy';
+    nativeBtn.hidden = typeof navigator.share !== 'function';
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    shareText.style.height = 'auto';                       // fit the whole summary, no inner scrolling
+    shareText.style.height = (shareText.scrollHeight + 4) + 'px';
+    shareText.scrollTop = 0;
+    copyBtn.focus();
+  });
+  copyBtn.addEventListener('click', async () => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(shareText.value); ok = true; } catch (e) {}
+    if (!ok) { try { shareText.focus(); shareText.select(); ok = document.execCommand('copy'); } catch (e) {} }
+    if (ok) setCopyLabel('Copied', 1800);
+    else { shareText.focus(); shareText.select(); setCopyLabel('Selected: copy it now', 3000); }
+  });
+  nativeBtn.addEventListener('click', async () => {
+    try { await navigator.share({ title: 'Match summary', text: shareText.value }); }
+    catch (e) { if (!e || e.name !== 'AbortError') copyBtn.click(); }
+  });
+  $('shareClose').addEventListener('click', closeDlg);
+  dlg.addEventListener('click', e => { if (e.target === dlg) closeDlg(); });
+
+  const resetBtn = $('newMatch');
+  let armTimer = null;
+  function disarm() {
+    clearTimeout(armTimer); armTimer = null;
+    resetBtn.textContent = 'New match';
+    resetBtn.classList.remove('armed');
+  }
+  resetBtn.addEventListener('click', () => {
+    if (!armTimer) {
+      resetBtn.textContent = 'Erase this match? Tap again';
+      resetBtn.classList.add('armed');
+      armTimer = setTimeout(disarm, 3500);
+      return;
+    }
+    disarm();
+    wake(false);
+    S = blank();
+    render();
+    save();
+    R.name.v.focus();
+  });
+
+  setInterval(() => {
+    if (!S.running) return;
+    settle();
+    render();
+    if (Math.floor(S.clockMs / 1000) % 2 === 0) save();
+  }, 100);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { settle(); save(); }
+    else if (S.running && !lock) wake(true);
+  });
+  window.addEventListener('pagehide', () => { settle(); save(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
