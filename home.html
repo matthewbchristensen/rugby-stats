@@ -1,30 +1,34 @@
 <!DOCTYPE html>
+<!-- © 2026 Larry Doong. All Rights Reserved -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="light">
 <title>Rugby stat tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Permanent+Marker&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Digital+Numbers&family=Patrick+Hand&family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>
-  /* ---------- Tokens: light = whiteboard, dark = chalkboard ---------- */
+  /* ---------- Tokens: one high-contrast UGA theme, built for direct sun ---------- */
   :root {
-    --paper: #f7f8f5;
-    --ink: #15181a;          /* static labels, outlines (black) */
-    --ink-soft: #7a827d;     /* dotted centre line */
-    --gray: #6a726d;         /* user-entered text (team names) */
-    --gray-line: #b3b9b4;
-    --blue: #1d48d6;         /* live, computed values */
-    --green: #12894a;
-    --red: #d9332d;
-    --green-tint: #dcf1e4;
-    --red-tint: #fadedc;
+    --paper: #ffffff;        /* Chapel Bell White: page background */
+    --ink: #000000;          /* Arch Black: static labels, outlines */
+    --gray: #3f3f3f;         /* user-entered text (team names) — dark enough for AA contrast on white */
+    --gray-line: #9a9a9a;    /* dashed underline under a blank name field */
+    --red: #ba0c2f;          /* UGA Bulldog Red (PMS 200) */
+    --red-press: #8c0924;
+    --green: #0f6b35;        /* accessible add/available green, distinct from the LED green below */
+    --green-press: #0a4f27;
     --on-color: #ffffff;
+
+    --led-bg: #0a0a0a;                 /* near-black housing behind every live number */
+    --led: #33ff70;                    /* old-LED green */
+    --led-glow: rgba(51, 255, 112, .6);
 
     --hand: 'Patrick Hand', 'Segoe Print', 'Bradley Hand', system-ui, sans-serif;
     --marker: 'Permanent Marker', 'Marker Felt', 'Chalkboard SE', Impact, system-ui, sans-serif;
+    --led-font: 'Digital Numbers', 'DSEG7 Classic', Consolas, 'Courier New', monospace;
 
     --u: min(100vw, 640px);
     --btn: clamp(36px, calc(var(--u) * .1), 60px);
@@ -35,44 +39,12 @@
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #1e2426;
-      --ink: #eef1ee;
-      --ink-soft: #7d8783;
-      --gray: #9ca5a1;
-      --gray-line: #55605c;
-      --blue: #79b4ff;
-      --green: #3fcf7c;
-      --red: #ff6b62;
-      --green-tint: rgba(63, 207, 124, .16);
-      --red-tint: rgba(255, 107, 98, .16);
-      --on-color: #10171a;
-    }
-  }
-  :root[data-theme="dark"] {
-    --paper: #1e2426;
-    --ink: #eef1ee;
-    --ink-soft: #7d8783;
-    --gray: #9ca5a1;
-    --gray-line: #55605c;
-    --blue: #79b4ff;
-    --green: #3fcf7c;
-    --red: #ff6b62;
-    --green-tint: rgba(63, 207, 124, .16);
-    --red-tint: rgba(255, 107, 98, .16);
-    --on-color: #10171a;
-  }
-  @media (max-width: 349px) {
-    :root { --btn: 31px; }
-    .wl { --val: 40px; }
-  }
-
   *, *::before, *::after { box-sizing: border-box; }
   html { height: 100%; background: var(--paper); scroll-padding-top: env(safe-area-inset-top, 0px); }
   body {
     height: 100%;
     margin: 0;
+    overflow: hidden;
     background: var(--paper);
     color: var(--ink);
     font-family: var(--hand);
@@ -85,13 +57,62 @@
 
   .app {
     max-width: 640px;
-    min-height: 100%;
+    height: 100%;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     padding: 8px var(--pad) 14px;
     padding-left: max(var(--pad), env(safe-area-inset-left, 0px));
     padding-right: max(var(--pad), env(safe-area-inset-right, 0px));
+  }
+
+  /* Scoreboard, clock, UGA toggle and team names stay put; only .scroll moves */
+  .top {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: clamp(5px, 1.6vw, 9px);
+  }
+  .topmain { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .siderail {
+    flex: 0 0 auto;
+    width: clamp(22px, 6vw, 30px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: var(--hand);
+    font-size: clamp(14px, calc(var(--u) * .042), 19px);
+    letter-spacing: .08em;
+    color: var(--ink);
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 10px;
+    padding: 6px 2px;
+    margin: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .15s, border-color .15s, color .15s, transform .08s;
+  }
+  .siderail.uga { background: var(--red); border-color: var(--red); color: var(--on-color); }
+  .siderail:active:not(:disabled) { transform: scale(.97); }
+  .siderail:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+  .siderail:disabled { cursor: not-allowed; opacity: .55; }
+  .siderail:disabled.uga { opacity: .8; }
+  .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    display: flex;
+    flex-direction: column;
   }
 
   /* ---------- Scoreboard ---------- */
@@ -103,19 +124,23 @@
     padding: 6px 0 14px;
   }
   .scorebox {
-    border: 3px solid var(--ink);
+    border: 4px solid var(--ink);
     border-radius: 10px;
+    background: var(--led-bg);
     display: grid;
     place-items: center;
     min-height: clamp(88px, calc(var(--u) * .27), 140px);
     overflow: hidden;
+    transition: border-color .15s;
   }
+  .scorebox.uga { border-color: var(--red); }
   .scorenum {
     display: inline-block;
-    font-family: var(--marker);
+    font-family: var(--led-font);
     font-size: clamp(46px, calc(var(--u) * .15), 90px);
     line-height: 1;
-    color: var(--blue);
+    color: var(--led);
+    text-shadow: 0 0 .09em var(--led-glow), 0 0 .22em var(--led-glow);
   }
   .scorenum.tri { font-size: clamp(34px, calc(var(--u) * .11), 66px); }
   .clockcol {
@@ -126,22 +151,26 @@
     gap: clamp(8px, 2vw, 14px);
   }
   .clockbox {
-    border: 3px solid var(--ink);
+    border: 4px solid var(--ink);
     border-radius: 10px;
+    background: var(--led-bg);
     padding: 6px clamp(8px, 2.4vw, 16px) 5px;
     text-align: center;
   }
   .clock {
-    font-family: var(--marker);
+    font-family: var(--led-font);
     font-size: clamp(32px, calc(var(--u) * .105), 60px);
     line-height: 1.1;
-    color: var(--blue);
+    color: var(--led);
+    text-shadow: 0 0 .09em var(--led-glow), 0 0 .22em var(--led-glow);
     white-space: nowrap;
   }
   .period {
+    font-family: var(--hand);
     font-size: clamp(15px, calc(var(--u) * .042), 22px);
     line-height: 1;
-    color: var(--blue);
+    color: var(--led);
+    text-shadow: 0 0 .1em var(--led-glow);
     margin-top: 3px;
   }
   .clock .d { display: inline-block; width: .7em; text-align: center; }
@@ -170,17 +199,17 @@
   .seg svg { width: 46%; height: 62%; fill: currentColor; }
   .seg.play { color: var(--green); }
   .seg.pause { color: var(--red); }
-  .seg.play.on { background: var(--green-tint); }
-  .seg.pause.on { background: var(--red-tint); }
-  .seg:active { background: var(--ink-soft); }
-  .seg:focus-visible { outline: 3px solid var(--blue); outline-offset: -6px; }
+  .seg.play.on { background: var(--green); color: var(--on-color); }
+  .seg.pause.on { background: var(--red); color: var(--on-color); }
+  .seg:active { background: rgba(0, 0, 0, .14); }
+  .seg:focus-visible { outline: 3px solid var(--red); outline-offset: -6px; }
   .seg.half {
     font-family: var(--hand);
     font-size: clamp(18px, calc(var(--u) * .05), 25px);
     line-height: 1;
     color: var(--green);
   }
-  .seg.half.on { background: var(--green-tint); }
+  .seg.half.on { background: var(--green); color: var(--on-color); }
   .seg:disabled { opacity: .3; cursor: not-allowed; }
   .seg:disabled:active { background: transparent; }
 
@@ -192,16 +221,12 @@
   }
   .team {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    padding: 4px 8px 8px;
+    justify-content: center;
+    padding: 4px 8px;
     min-width: 0;
   }
   .team + .team { border-left: 3px solid var(--ink); }
-  .role {
-    font-size: clamp(17px, calc(var(--u) * .05), 26px);
-    color: var(--ink);
-  }
   .team input {
     width: 100%;
     text-align: center;
@@ -216,8 +241,9 @@
     padding: 0 4px 2px;
     outline: none;
   }
-  .team input::placeholder { color: var(--gray); opacity: .55; }
-  .team input:focus-visible { outline: 3px solid var(--blue); outline-offset: 1px; border-radius: 6px; border-bottom-color: transparent; }
+  .team.uga input { border-bottom-color: var(--red); }
+  .team input::placeholder { color: var(--gray); opacity: .6; }
+  .team input:focus-visible { outline: 3px solid var(--red); outline-offset: 1px; border-radius: 6px; border-bottom-color: transparent; }
   .hint {
     margin: 8px 0 0;
     text-align: center;
@@ -225,6 +251,19 @@
     color: var(--ink);
   }
   .hint[hidden] { display: none; }
+
+  .locknote {
+    display: none;
+    margin: 2px 3% 14px;
+    padding: 8px 12px;
+    text-align: center;
+    font-size: clamp(14px, calc(var(--u) * .042), 17px);
+    color: var(--red);
+    background: #fdecef;
+    border: 2px dashed var(--red);
+    border-radius: 10px;
+  }
+  .locknote.show { display: block; }
 
   /* ---------- Board ---------- */
   .board {
@@ -241,7 +280,7 @@
     left: 50%;
     top: 0;
     bottom: 0;
-    border-left: 3px dotted var(--ink-soft);
+    border-left: 3px dotted var(--red);
     transform: translateX(-50%);
     z-index: 0;
   }
@@ -257,7 +296,9 @@
   }
   .label {
     justify-self: center;
+    min-width: 0;
     max-width: 100%;
+    overflow-wrap: anywhere;
     font-size: clamp(16px, calc(var(--u) * .047), 27px);
     line-height: 1.05;
     text-align: center;
@@ -265,6 +306,7 @@
     padding: 3px .2em;
     color: var(--ink);
   }
+  .label.compact { font-size: clamp(13px, calc(var(--u) * .038), 22px); }
   .side-v { justify-self: start; }
   .side-h { justify-self: end; }
 
@@ -275,27 +317,31 @@
     align-items: center;
     justify-items: center;
   }
-  .wl { --val: clamp(48px, calc(var(--u) * .13), 84px); }
+  .wl { --val: clamp(42px, calc(var(--u) * .12), 80px); }
   .val {
     display: inline-block;
-    font-family: var(--marker);
-    font-size: clamp(22px, calc(var(--u) * .07), 40px);
+    font-family: var(--led-font);
+    font-size: clamp(20px, calc(var(--u) * .064), 36px);
     line-height: 1;
-    color: var(--blue);
+    color: var(--led);
+    background: var(--led-bg);
+    text-shadow: 0 0 .08em var(--led-glow), 0 0 .2em var(--led-glow);
+    border-radius: 7px;
+    padding: .12em .22em;
     white-space: nowrap;
   }
-  .wl .val { font-size: clamp(20px, calc(var(--u) * .062), 36px); }
+  .wl .val { font-size: clamp(18px, calc(var(--u) * .056), 32px); padding: .08em .16em; }
   .wlhead { padding: 8px 0 0; }
   .wlhead .group span { font-size: clamp(16px, calc(var(--u) * .045), 24px); color: var(--ink); line-height: 1; }
 
-  /* Round +/- buttons: black outline, green or red mark */
+  /* Round +/- buttons: bold colour ring on white, solid fill on press */
   .btn {
     position: relative;
     width: var(--btn);
     height: var(--btn);
     border-radius: 50%;
-    border: 3px solid var(--ink);
-    background: var(--tint);
+    border: 3px solid var(--c);
+    background: var(--paper);
     color: var(--c);
     display: grid;
     place-items: center;
@@ -306,22 +352,28 @@
     transition: transform .08s, background-color .12s, color .12s;
   }
   .btn::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; }
-  .btn.plus  { --c: var(--green); --tint: var(--green-tint); }
-  .btn.minus { --c: var(--red);   --tint: var(--red-tint); }
-  .btn svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+  .btn.plus  { --c: var(--green); }
+  .btn.minus { --c: var(--red); }
+  .btn svg { width: 58%; height: 58%; fill: none; stroke: currentColor; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
   .btn:active:not(:disabled) { transform: scale(.9); background: var(--c); color: var(--on-color); }
-  .btn:disabled { opacity: .28; cursor: not-allowed; }
-  .btn:focus-visible, .pad:focus-visible, .textbtn:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+  .btn:disabled { opacity: .32; cursor: not-allowed; }
+  .btn:focus-visible, .pad:focus-visible, .textbtn:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
 
   /* Possession / territory: green = has it now, red = doesn't */
   .row.padrow { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
   .padside { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; }
   .pct {
-    font-family: var(--marker);
-    font-size: clamp(17px, calc(var(--u) * .05), 30px);
-    color: var(--blue);
+    display: inline-block;
+    font-family: var(--led-font);
+    font-size: clamp(15px, calc(var(--u) * .046), 27px);
+    color: var(--led);
+    background: var(--led-bg);
+    text-shadow: 0 0 .08em var(--led-glow), 0 0 .2em var(--led-glow);
+    border-radius: 7px;
+    padding: .1em .22em;
     min-width: 3.3ch;
-    line-height: 1;
+    text-align: center;
+    line-height: 1.3;
   }
   .padside.side-v .pct { text-align: left; }
   .padside.side-h .pct { text-align: right; }
@@ -330,7 +382,7 @@
     flex: none;
     width: clamp(48px, calc(var(--u) * .135), 90px);
     height: clamp(32px, calc(var(--u) * .085), 46px);
-    border: 3px solid var(--ink);
+    border: 4px solid var(--ink);
     border-radius: 9px;
     background: var(--red);
     color: var(--on-color);
@@ -345,6 +397,8 @@
   .pad::after { content: ""; position: absolute; inset: -4px; }
   .pad[aria-pressed="true"] { background: var(--green); }
   .pad:active { transform: scale(.94); }
+  .pad:disabled { opacity: .35; cursor: not-allowed; }
+  .pad:disabled:active { transform: none; }
   .pad svg { width: 42%; height: 62%; fill: none; stroke: currentColor; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
   .pad[aria-pressed="true"] svg { opacity: 1; }
 
@@ -373,12 +427,20 @@
   }
   .textbtn.armed { color: var(--red); }
 
+  .copyright {
+    margin: 0;
+    padding: 4px 0 10px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--gray);
+  }
+
   /* ---------- Share sheet ---------- */
   dialog {
     width: min(92vw, 460px);
     max-height: 90%;
     padding: 0;
-    border: 3px solid var(--ink);
+    border: 4px solid var(--ink);
     border-radius: 14px;
     background: var(--paper);
     color: var(--ink);
@@ -397,7 +459,7 @@
     line-height: 1.35;
     color: var(--ink);
     background: transparent;
-    border: 2px solid var(--gray-line);
+    border: 2px solid var(--ink);
     border-radius: 8px;
     padding: 10px 12px;
   }
@@ -409,14 +471,14 @@
     padding: 6px 18px;
     border: 3px solid var(--ink);
     border-radius: 999px;
-    background: transparent;
+    background: var(--paper);
     color: var(--ink);
     cursor: pointer;
     touch-action: manipulation;
   }
-  .pillbtn.go { color: var(--green); background: var(--green-tint); }
+  .pillbtn.go { color: var(--on-color); background: var(--green); border-color: var(--green); }
   .pillbtn[hidden] { display: none; }
-  .pillbtn:focus-visible, textarea:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+  .pillbtn:focus-visible, textarea:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
 
   /* ---------- Motion (answers a tap) ---------- */
   .pop { animation: pop .22s ease-out; }
@@ -433,50 +495,66 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
+
+  /* ---------- Narrowest phones: placed last so it wins over the base rules above ---------- */
+  @media (max-width: 349px) {
+    :root { --btn: 28px; --pad: 8px; }
+    .wl { --val: 34px; }
+    .wl .val { padding: .05em .1em; font-size: 14px; }
+    .group { column-gap: 1px; }
+    .label { font-size: 15px; padding: 3px .15em; }
+  }
 </style>
 </head>
 <body>
 <main class="app">
 
-  <header class="scoreboard">
-    <div class="scorebox" id="boxV" role="group" aria-label="Visitor score"><span class="scorenum" id="scoreV">0</span></div>
-    <div class="clockcol">
-      <div class="clockbox">
-        <div class="clock" id="clock" role="timer" aria-label="Match clock 00:00"></div>
-        <div class="period" id="period">Kick-off</div>
-      </div>
-      <div class="transport">
-        <button type="button" class="seg play" id="playBtn" aria-label="Start clock" aria-pressed="false">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        </button>
-        <button type="button" class="seg pause" id="pauseBtn" aria-label="Pause clock">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1.2"/><rect x="14" y="4.5" width="4.5" height="15" rx="1.2"/></svg>
-        </button>
-        <button type="button" class="seg half" id="halfBtn" aria-label="Mark half-time" aria-pressed="false" aria-keyshortcuts="Backspace" disabled>HT</button>
-        <button type="button" class="seg half" id="fullBtn" aria-label="Mark full-time" aria-pressed="false" aria-keyshortcuts="Backspace" disabled>FT</button>
-      </div>
+  <div class="top">
+    <button type="button" class="siderail" id="edgeV" data-side="v" aria-pressed="false" title="Make Visitor the UGA side">VISITOR</button>
+    <div class="topmain">
+      <header class="scoreboard">
+        <div class="scorebox" id="boxV" role="group" aria-label="Visitor score"><span class="scorenum" id="scoreV">0</span></div>
+        <div class="clockcol">
+          <div class="clockbox">
+            <div class="clock" id="clock" role="timer" aria-label="Match clock 00:00"></div>
+            <div class="period" id="period">Kick-off</div>
+          </div>
+          <div class="transport">
+            <button type="button" class="seg play" id="playBtn" aria-label="Start clock" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="seg pause" id="pauseBtn" aria-label="Pause clock">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1.2"/><rect x="14" y="4.5" width="4.5" height="15" rx="1.2"/></svg>
+            </button>
+            <button type="button" class="seg half" id="halfBtn" aria-label="Mark half-time" aria-pressed="false" aria-keyshortcuts="Backspace" disabled>HT</button>
+            <button type="button" class="seg half" id="fullBtn" aria-label="Mark full-time" aria-pressed="false" aria-keyshortcuts="Backspace" disabled>FT</button>
+          </div>
+        </div>
+        <div class="scorebox" id="boxH" role="group" aria-label="Home score"><span class="scorenum" id="scoreH">0</span></div>
+      </header>
+
+      <section class="names" aria-label="Team names">
+        <label class="team" id="teamV">
+          <input id="nameV" type="text" maxlength="16" placeholder="TEAM 1" aria-label="Visitor team name" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done">
+        </label>
+        <label class="team" id="teamH">
+          <input id="nameH" type="text" maxlength="16" placeholder="TEAM 2" aria-label="Home team name" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done">
+        </label>
+      </section>
+      <p class="hint" id="hint" role="status" hidden>Enter both team names to start the clock.</p>
     </div>
-    <div class="scorebox" id="boxH" role="group" aria-label="Home score"><span class="scorenum" id="scoreH">0</span></div>
-  </header>
+    <button type="button" class="siderail" id="edgeH" data-side="h" aria-pressed="true" title="Make Home the UGA side">HOME</button>
+  </div>
 
-  <section class="names" aria-label="Team names">
-    <label class="team">
-      <span class="role">Visitor</span>
-      <input id="nameV" type="text" maxlength="16" placeholder="Team 1" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
-    </label>
-    <label class="team">
-      <span class="role">Home</span>
-      <input id="nameH" type="text" maxlength="16" placeholder="Team 2" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done">
-    </label>
-  </section>
-  <p class="hint" id="hint" role="status" hidden>Enter both team names to start the clock.</p>
+  <div class="scroll">
+    <section class="board" id="board" aria-label="Match statistics"></section>
 
-  <section class="board" id="board" aria-label="Match statistics"></section>
-
-  <footer class="foot">
-    <button type="button" class="textbtn" id="shareBtn">Share stats</button>
-    <button type="button" class="textbtn" id="newMatch">New match</button>
-  </footer>
+    <footer class="foot">
+      <button type="button" class="textbtn" id="shareBtn">Share stats</button>
+      <button type="button" class="textbtn" id="newMatch">New match</button>
+    </footer>
+    <p class="copyright">© 2026 Larry Doong. All rights reserved.</p>
+  </div>
 
 </main>
 
@@ -500,22 +578,24 @@
   const KEY = 'rugby-stat-tracker-v1';
   const SIDES = ['v', 'h'];
   const TEAM = { v: 'Visitor', h: 'Home' };
-  const TEAM_KEYS = ['tries', 'conv', 'pk', 'scrumW', 'scrumL', 'loW', 'loL', 'pen', 'to'];
+  const TEAM_KEYS = ['tries', 'conv', 'pk', 'scrumW', 'scrumL', 'loW', 'loL', 'to', 'pen', 'yc', 'rc'];
   const blankTeam = () => Object.fromEntries(TEAM_KEYS.map(k => [k, 0]));
   const blank = () => ({
     names: { v: '', h: '' },
+    ugaSide: 'h',
     half: null,
     full: null,
     clockMs: 0, running: false, lastTick: 0,
     poss: { v: 0, h: 0 }, terr: { v: 0, h: 0 },
     possNow: null, terrNow: null,
-    stats: { v: blankTeam(), h: blankTeam() }
+    stats: { v: blankTeam(), h: blankTeam() },
+    cards: { v: [], h: [] }   // each entry: { type: 'yellow'|'red', half: 'Kick-off'|'1st half'|..., clockMs }
   });
 
   const ms = x => (Number.isFinite(x) && x > 0 ? x : 0);
   const cnt = x => Math.floor(ms(x));
   const sideOf = x => (x === 'v' || x === 'h' ? x : null);
-  const nameOf = x => (typeof x === 'string' ? x.slice(0, 16) : '');
+  const nameOf = x => (typeof x === 'string' ? x.slice(0, 16).toUpperCase() : '');
 
   function load() {
     const b = blank();
@@ -525,6 +605,7 @@
       const p = JSON.parse(raw) || {};
       b.names.v = nameOf(p.names && p.names.v);
       b.names.h = nameOf(p.names && p.names.h);
+      b.ugaSide = sideOf(p.ugaSide) || 'h';
       b.clockMs = ms(p.clockMs);
       if (p.half && typeof p.half === 'object') {
         b.half = { clockMs: ms(p.half.clockMs), v: cnt(p.half.v), h: cnt(p.half.h) };
@@ -540,6 +621,16 @@
       });
       b.possNow = sideOf(p.possNow);
       b.terrNow = sideOf(p.terrNow);
+      SIDES.forEach(s => {
+        const arr = p.cards && p.cards[s];
+        if (Array.isArray(arr)) {
+          b.cards[s] = arr
+            .filter(c => c && (c.type === 'yellow' || c.type === 'red') && typeof c.half === 'string')
+            .map(c => ({ type: c.type, half: c.half, clockMs: cnt(c.clockMs) }));
+        }
+        b.stats[s].yc = b.cards[s].filter(c => c.type === 'yellow').length;
+        b.stats[s].rc = b.cards[s].filter(c => c.type === 'red').length;
+      });
       // A restored match always comes back paused so no time is invented.
     } catch (e) { /* storage empty or unavailable */ }
     return b;
@@ -549,6 +640,18 @@
   let S = load();
 
   const score = s => { const t = S.stats[s]; return t.tries * 5 + t.conv * 2 + t.pk * 3; };
+  const namesFilled = () => S.names.v.trim() && S.names.h.trim();
+  // "Started" is one-way: once the clock has ever run, stat buttons stay unlocked even if paused later.
+  const matchStarted = () => S.running || S.clockMs > 0;
+  const canTrack = () => namesFilled() && matchStarted();
+  // Same label whether it's driving the on-screen caption or being stamped onto a card entry.
+  function periodLabel() {
+    const beyond = m => S.running || S.clockMs > m.clockMs + 500;   // clock has moved on since the marker
+    if (!S.half && !S.full && !S.running && S.clockMs <= 0) return 'Kick-off';
+    if (S.full) return beyond(S.full) ? 'Extra time' : 'Full time';
+    if (S.half) return beyond(S.half) ? '2nd half' : 'Half-time';
+    return '1st half';
+  }
 
   /* ---------- Clock, possession and territory all run off one timer ---------- */
   function settle() {
@@ -644,6 +747,22 @@
     if (next < 0) return;
     if (key === 'conv' && next > st.tries) return;   // a conversion needs a try
     if (key === 'tries' && next < st.conv) return;   // remove the conversion first
+    if (key === 'yc' || key === 'rc') {
+      const type = key === 'yc' ? 'yellow' : 'red';
+      const log = S.cards[side];
+      if (delta > 0) {
+        settle();
+        log.push({ type, half: periodLabel(), clockMs: S.clockMs });
+      } else {
+        for (let i = log.length - 1; i >= 0; i--) {
+          if (log[i].type === type) { log.splice(i, 1); break; }   // drop the most recent one of this type
+        }
+      }
+      st[key] = log.filter(c => c.type === type).length;   // the log is the source of truth
+      st.pen = Math.max(0, st.pen + delta);   // a card always comes from a penalty, so keep the count in step
+      changed();
+      return;
+    }
     st[key] = next;
     changed();
   }
@@ -712,7 +831,11 @@
       R.cnt[key][s] = { minus, val, plus };
       cells[s] = g;
     });
-    row.append(cells.v, el('div', 'label', label), cells.h);
+    // A long unbreakable word (no space to wrap on, like "Drop/Penalty") needs a smaller
+    // font so it fits one line instead of fracturing mid-word.
+    const longestWord = Math.max(...label.split(' ').map(w => w.length));
+    const labelEl = el('div', 'label' + (longestWord > 11 ? ' compact' : ''), label);
+    row.append(cells.v, labelEl, cells.h);
     return row;
   }
 
@@ -741,25 +864,32 @@
       holdToUndo(lost, () => S.stats[s][lKey] > 0, () => bump(s, lKey, -1));
       [won, lost].forEach(b => { b.title = 'Hold to undo'; b.setAttribute('aria-keyshortcuts', 'Backspace'); });
       g.append(won, val, lost);
-      R.wl[id][s] = { val };
+      R.wl[id][s] = { val, won, lost };
       cells[s] = g;
     });
     row.append(cells.v, el('div', 'label', label), cells.h);
     return row;
   }
 
+  const lockNote = el('p', 'locknote', 'Enter both team names and start the clock to begin tracking.');
+  lockNote.id = 'lockNote';
+  lockNote.setAttribute('role', 'status');
+
   $('board').append(
+    lockNote,
     padRow('poss', 'Possession'), rule(),
     padRow('terr', 'Territory'), rule(),
     counterRow('tries', 'Tries'),
     counterRow('conv', 'Conversions'),
-    counterRow('pk', 'Penalty kicks'), rule(),
+    counterRow('pk', 'Drop/Penalty goals'), rule(),
     wlHead(),
     wlRow('scrum', 'Scrums', 'scrumW', 'scrumL'),
     wlRow('lo', 'Lineouts', 'loW', 'loL'),
     el('div', 'note', 'Hold a + to undo'), rule(),
+    counterRow('to', 'Turnovers'),
     counterRow('pen', 'Penalties'),
-    counterRow('to', 'Turnovers')
+    counterRow('yc', 'Yellow cards'),
+    counterRow('rc', 'Red cards')
   );
 
   R.score.v = $('scoreV'); R.score.h = $('scoreH');
@@ -770,6 +900,9 @@
   R.half = $('halfBtn');
   R.full = $('fullBtn');
   R.period = $('period');
+  R.box = { v: $('boxV'), h: $('boxH') };
+  R.teamBox = { v: $('teamV'), h: $('teamH') };
+  R.rail = { v: $('edgeV'), h: $('edgeH') };
 
   /* ---------- Render ---------- */
   function shares(o) {
@@ -808,12 +941,7 @@
     R.play.setAttribute('aria-pressed', String(S.running));
     R.pause.classList.toggle('on', !S.running && S.clockMs > 0);
 
-    const beyond = m => S.running || S.clockMs > m.clockMs + 500;   // clock has moved on since the marker
-    let cap = '1st half';
-    if (!S.half && !S.full && !S.running && S.clockMs <= 0) cap = 'Kick-off';
-    else if (S.full) cap = beyond(S.full) ? 'Extra time' : 'Full time';
-    else if (S.half) cap = beyond(S.half) ? '2nd half' : 'Half-time';
-    setText(R.period, cap);
+    setText(R.period, periodLabel());
     [['half', R.half, 'half-time'], ['full', R.full, 'full-time']].forEach(([k, btn, name]) => {
       const m = S[k];
       btn.classList.toggle('on', !!m);
@@ -824,10 +952,14 @@
       btn.title = label;
     });
 
+    const locked = !canTrack();
+    $('lockNote').classList.toggle('show', locked);
+
     ['poss', 'terr'].forEach(f => {
       const sh = shares(S[f]);
       SIDES.forEach(s => {
         R.pad[f][s].setAttribute('aria-pressed', String(S[f + 'Now'] === s));
+        R.pad[f][s].disabled = locked;
         setText(R.pct[f][s], sh[s] + '%');
       });
     });
@@ -840,29 +972,62 @@
         let plusOff = false;
         if (key === 'tries' && st.tries <= st.conv) minusOff = true;
         if (key === 'conv' && st.conv >= st.tries) plusOff = true;
-        c.minus.disabled = minusOff;
-        c.plus.disabled = plusOff;
+        c.minus.disabled = minusOff || locked;
+        c.plus.disabled = plusOff || locked;
       });
     });
 
     Object.keys(R.wl).forEach(id => {
       const { wKey, lKey } = R.wl[id];
-      SIDES.forEach(s => setText(R.wl[id][s].val, S.stats[s][wKey] + '/' + S.stats[s][lKey], true));
+      SIDES.forEach(s => {
+        setText(R.wl[id][s].val, S.stats[s][wKey] + '/' + S.stats[s][lKey], true);
+        R.wl[id][s].won.disabled = locked;
+        R.wl[id][s].lost.disabled = locked;
+      });
     });
 
     SIDES.forEach(s => { if (R.name[s].value !== S.names[s]) R.name[s].value = S.names[s]; });
     if (S.names.v.trim() && S.names.h.trim()) $('hint').hidden = true;
+
+    const started = matchStarted();
+    SIDES.forEach(s => {
+      const isUga = S.ugaSide === s;
+      R.box[s].classList.toggle('uga', isUga);
+      R.teamBox[s].classList.toggle('uga', isUga);
+      R.rail[s].classList.toggle('uga', isUga);
+      R.rail[s].setAttribute('aria-pressed', String(isUga));
+      R.rail[s].disabled = started;
+      R.rail[s].title = started ? "Can't change once the match has started" : (isUga ? '' : ('Make ' + TEAM[s] + ' the UGA side'));
+    });
   }
 
   /* ---------- Wiring ---------- */
+  // Force team names to ALL CAPS as they're typed, keeping the caret in place.
   SIDES.forEach(s => {
     R.name[s].addEventListener('input', () => {
-      S.names[s] = R.name[s].value.slice(0, 16);
+      const el = R.name[s];
+      const pos = el.selectionStart;
+      const raw = el.value.slice(0, 16);
+      const fixed = raw.toUpperCase();
+      if (fixed !== el.value) { el.value = fixed; try { el.setSelectionRange(pos, pos); } catch (e) {} }
+      S.names[s] = fixed;
       if (S.names.v.trim() && S.names.h.trim()) $('hint').hidden = true;
-      save();
+      changed();
     });
     R.name[s].addEventListener('keydown', e => { if (e.key === 'Enter') R.name[s].blur(); });
     R.name[s].addEventListener('animationend', () => R.name[s].classList.remove('shake'));
+  });
+
+  SIDES.forEach(s => {
+    R.rail[s].addEventListener('click', () => {
+      if (S.ugaSide === s) return;
+      buzz();
+      const old = S.ugaSide;
+      if (S.names[old].trim().toLowerCase() === 'georgia') S.names[old] = '';
+      S.ugaSide = s;
+      if (!S.names[s].trim()) S.names[s] = 'GEORGIA';
+      changed();
+    });
   });
 
   R.play.addEventListener('click', () => { buzz(); play(); });
@@ -905,11 +1070,25 @@
     lines.push('Territory: ' + pctLine(S.terr));
     lines.push('Tries: ' + a.tries + ' – ' + b.tries);
     lines.push('Conversions: ' + a.conv + ' – ' + b.conv);
-    lines.push('Penalty kicks: ' + a.pk + ' – ' + b.pk);
+    lines.push('Drop/Penalty goals: ' + a.pk + ' – ' + b.pk);
     lines.push('Scrums won/lost: ' + a.scrumW + '/' + a.scrumL + ' – ' + b.scrumW + '/' + b.scrumL);
     lines.push('Lineouts won/lost: ' + a.loW + '/' + a.loL + ' – ' + b.loW + '/' + b.loL);
-    lines.push('Penalties: ' + a.pen + ' – ' + b.pen);
     lines.push('Turnovers: ' + a.to + ' – ' + b.to);
+    lines.push('Penalties: ' + a.pen + ' – ' + b.pen);
+    lines.push('Yellow cards: ' + a.yc + ' – ' + b.yc);
+    lines.push('Red cards: ' + a.rc + ' – ' + b.rc);
+
+    const incidents = SIDES.flatMap(s => S.cards[s].map(c => ({ ...c, side: s })))
+      .sort((x, y) => x.clockMs - y.clockMs);
+    if (incidents.length) {
+      lines.push('');
+      lines.push('Cards:');
+      incidents.forEach(c => {
+        const who = c.side === 'v' ? vn : hn;
+        const kind = c.type === 'yellow' ? 'Yellow card' : 'Red card';
+        lines.push(kind + ': ' + who + ', ' + c.half + ' ' + clockStr(c.clockMs));
+      });
+    }
     return lines.join('\n');
   }
   const closeDlg = () => { if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open'); };
@@ -982,4 +1161,5 @@
 })();
 </script>
 </body>
+<!-- © 2026 Larry Doong. All Rights Reserved -->
 </html>
